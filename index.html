@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Колесо Фортуни MMORPG</title>
+    <!-- Telegram WebApp SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800;900&family=MedievalSharp&family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #0d0a08;
+            --panel-bg: rgba(22, 17, 13, 0.92);
+            --gold-primary: #d4af37;
+            --gold-light: #f3e5ab;
+            --gold-dark: #8a6d1b;
+            --border-color: #4a3821;
+            --text-main: #e0d5c1;
+            
+            --rarity-common: #9d9d9d;
+            --rarity-uncommon: #1eff00;
+            --rarity-rare: #0070dd;
+            --rarity-epic: #a335ee;
+            --rarity-legendary: #ff8000;
+            --rarity-mythic: #e6cc80;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+
+        body {
+            background-color: var(--bg-dark);
+            background-image: radial-gradient(circle at center, rgba(30, 20, 10, 0.8) 0%, rgba(5, 3, 2, 0.98) 100%);
+            color: var(--text-main);
+            font-family: 'Montserrat', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 15px;
+        }
+
+        header h1 {
+            font-family: 'Cinzel', serif;
+            font-size: 24px;
+            color: var(--gold-light);
+            text-align: center;
+            text-transform: uppercase;
+        }
+
+        header p {
+            font-family: 'MedievalSharp', cursive;
+            font-size: 14px;
+            color: var(--gold-primary);
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        .user-card {
+            background: var(--panel-bg);
+            border: 2px solid var(--border-color);
+            border-radius: 10px;
+            padding: 10px 15px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            max-width: 360px;
+            margin-bottom: 15px;
+        }
+
+        .wheel-container {
+            position: relative;
+            width: 320px;
+            height: 320px;
+            margin: 10px auto;
+        }
+
+        .wheel-frame {
+            position: absolute;
+            width: 320px;
+            height: 320px;
+            border-radius: 50%;
+            border: 8px solid #2d1e12;
+            box-shadow: 0 0 0 2px var(--gold-primary);
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .pointer {
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0; height: 0;
+            border-left: 15px solid transparent;
+            border-right: 15px solid transparent;
+            border-top: 30px solid var(--gold-light);
+            z-index: 10;
+        }
+
+        canvas#wheelCanvas { width: 320px; height: 320px; border-radius: 50%; }
+
+        .spin-btn {
+            margin-top: 20px;
+            background: linear-gradient(180deg, #d4af37 0%, #8a6d1b 100%);
+            border: 2px solid var(--gold-light);
+            border-radius: 8px;
+            padding: 14px;
+            font-family: 'Cinzel', serif;
+            font-size: 18px;
+            font-weight: 900;
+            color: #1a0f05;
+            cursor: pointer;
+            width: 100%;
+            max-width: 320px;
+            text-transform: uppercase;
+        }
+
+        .spin-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* Модальне вікно */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 100; opacity: 0; pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal-overlay.active { opacity: 1; pointer-events: all; }
+
+        .reward-card {
+            background: var(--panel-bg);
+            border: 2px solid var(--gold-primary);
+            border-radius: 12px;
+            padding: 25px;
+            text-align: center;
+            width: 90%; max-width: 320px;
+        }
+
+        .reward-icon { font-size: 50px; margin: 15px 0; }
+        .reward-name { font-family: 'Cinzel', serif; font-size: 18px; font-weight: bold; }
+        
+        .claim-btn {
+            margin-top: 15px;
+            background: var(--gold-primary);
+            border: none;
+            padding: 10px 20px;
+            font-family: 'Cinzel', serif;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Колесо Фортуни</h1>
+        <p>Середньовічна Рулетка</p>
+    </header>
+
+    <div class="user-card">
+        <div id="uName">Гравець</div>
+        <div>Спіни: <span id="spinsVal">1</span></div>
+    </div>
+
+    <div class="wheel-container">
+        <div class="wheel-frame"></div>
+        <div class="pointer"></div>
+        <canvas id="wheelCanvas" width="640" height="640"></canvas>
+    </div>
+
+    <button class="spin-btn" id="spinBtn">Випробувати Долю</button>
+
+    <div class="modal-overlay" id="rewardModal">
+        <div class="reward-card">
+            <h2>Виграш!</h2>
+            <div class="reward-icon" id="modalIcon">🗡️</div>
+            <div class="reward-name" id="modalName">Меч</div>
+            <p style="font-size: 12px; color: #888; margin-top: 10px;">Предмет передається боту...</p>
+            <button class="claim-btn" id="claimBtn">Забрати в Бота</button>
+        </div>
+    </div>
+
+    <script>
+        const tg = window.Telegram?.WebApp;
+        if (tg) { tg.ready(); tg.expand(); }
+
+        const userData = tg?.initDataUnsafe?.user || { first_name: "Лицар" };
+        document.getElementById('uName').innerText = userData.first_name;
+
+        const ITEMS = [
+            { id: "sword_epic", name: "Епічний Меч", icon: "🗡️", color: "#3a1b4d" },
+            { id: "gold_100",  name: "100 Монет",   icon: "💰", color: "#4a4035" },
+            { id: "shield_rare",name: "Щит Лицаря", icon: "🛡️", color: "#182b45" },
+            { id: "potion_hp", name: "Зілля ХП",     icon: "🧪", color: "#1b3b1e" },
+            { id: "helm_dragon",name: "Шолом",      icon: "👑", color: "#4d2800" },
+            { id: "chest_gold", name: "Скриня",     icon: "🧰", color: "#4d4218" }
+        ];
+
+        let spins = 1;
+        let isSpinning = false;
+        let currentAngle = 0;
+
+        const canvas = document.getElementById('wheelCanvas');
+        const ctx = canvas.getContext('2d');
+        const numSlices = ITEMS.length;
+        const sliceAngle = (2 * Math.PI) / numSlices;
+
+        function drawWheel() {
+            const center = canvas.width / 2;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            for (let i = 0; i < numSlices; i++) {
+                const angle = currentAngle + i * sliceAngle;
+                ctx.beginPath();
+                ctx.moveTo(center, center);
+                ctx.arc(center, center, center - 10, angle, angle + sliceAngle);
+                ctx.fillStyle = ITEMS[i].color;
+                ctx.fill();
+                ctx.stroke();
+
+                ctx.save();
+                ctx.translate(center, center);
+                ctx.rotate(angle + sliceAngle / 2);
+                ctx.fillStyle = "#fff";
+                ctx.font = "bold 28px serif";
+                ctx.fillText(ITEMS[i].icon, center - 70, 10);
+                ctx.restore();
+            }
+        }
+        drawWheel();
+
+        document.getElementById('spinBtn').addEventListener('click', () => {
+            if (isSpinning || spins <= 0) return;
+            isSpinning = true;
+            spins--;
+            document.getElementById('spinsVal').innerText = spins;
+            document.getElementById('spinBtn').disabled = true;
+
+            const winIdx = Math.floor(Math.random() * numSlices);
+            const stopAngle = (3 * Math.PI / 2) - (winIdx * sliceAngle + sliceAngle / 2);
+            const totalRotation = (6 * 2 * Math.PI) + (stopAngle - (currentAngle % (2 * Math.PI)));
+            
+            const startAngle = currentAngle;
+            const duration = 4000;
+            const startTime = performance.now();
+
+            function animate(time) {
+                const elapsed = time - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                const easeOut = 1 - Math.pow(1 - progress, 3);
+                currentAngle = startAngle + totalRotation * easeOut;
+                drawWheel();
+
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                } else {
+                    isSpinning = false;
+                    showReward(ITEMS[winIdx]);
+                }
+            }
+            requestAnimationFrame(animate);
+        });
+
+        function showReward(item) {
+            document.getElementById('modalIcon').innerText = item.icon;
+            document.getElementById('modalName').innerText = item.name;
+            document.getElementById('rewardModal').classList.add('active');
+
+            // Надсилання даних боту через WebApp SDK
+            if (tg && tg.sendData) {
+                const data = JSON.stringify({
+                    item_id: item.id,
+                    item_name: item.name
+                });
+                tg.sendData(data);
+            }
+        }
+
+        document.getElementById('claimBtn').addEventListener('click', () => {
+            if (tg) tg.close();
+        });
+    </script>
+</body>
+</html>
